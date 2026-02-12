@@ -16,14 +16,19 @@ import Html.Events exposing (on)
 import Html.Attributes exposing (coords)
 
 
-
 type alias Coords
     = { q: Int
     , r: Int
     , s: Int
     }
 
-type Angle = Angle Int
+type Angle 
+    = QR 
+    | QS 
+    | RS
+    | RQ
+    | SQ
+    | SR
     
 type SomeHex 
     = Hex Coords
@@ -45,7 +50,12 @@ type alias Model =
 angle_to_int : Angle -> Int
 angle_to_int a = 
     case a of 
-        Angle b -> b
+        QR -> 45
+        QS -> 90
+        RS -> 135
+        RQ -> 225
+        SQ -> 270
+        SR -> 315
 
 get_coords : SomeHex -> Coords
 get_coords s = 
@@ -56,7 +66,20 @@ get_coords s =
             c
         Laser c _ ->
             c
-            
+
+
+get_angle : SomeHex -> Angle -> Angle
+get_angle h entry =
+    case h of
+        Laser _ a -> a
+        Hex _ -> entry
+        Stone _ -> entry         
+
+goes_laser_trough : SomeHex -> Bool
+goes_laser_trough h =
+    case h of
+        Stone _ -> False
+        _ -> True
 
 base_svg_attributes : Model -> List (Attribute msg)
 base_svg_attributes m = 
@@ -163,10 +186,20 @@ next_hex source model =
 coords_by_coords_and_angle : Coords -> Angle -> Coords
 coords_by_coords_and_angle coords a = 
     case a of
-        Angle 45 -> 
+        QR -> 
             {coords | q = coords.q + 1, r = coords.r - 1 }
-        _ -> coords
+        QS -> 
+            {coords | q = coords.q + 1, s = coords.s - 1 }
+        RS -> 
+            {coords | r = coords.r + 1, s = coords.s - 1 }
+        RQ -> 
+            {coords | r = coords.r + 1, q = coords.q - 1 }
+        SQ -> 
+            {coords | s = coords.s + 1, q = coords.q - 1 }
+        SR -> 
+            {coords | s = coords.s + 1, r = coords.r - 1 }
 
+find_hex_by_coords : Array.Array SomeHex -> Coords -> Maybe SomeHex
 find_hex_by_coords hexes coords = 
     let
         filter n = 
@@ -178,41 +211,49 @@ find_hex_by_coords hexes coords =
     in
         List.head (Array.toList f)
 
-hex_way model acc = 
-    let
-        -- TODO Here use coords_by_coords_and_angle to get coords find_hex_by_coords to find hex or Nothing
-        found = case acc of
-            [] -> 
-                Just (Hex (Coords 0 3 -3))
-            _ -> Nothing
-    in
-        case found of
-            Just h -> 
-                hex_way model (List.append acc [h])
-            Nothing ->
+-- TODO: recustion does not work
+hex_way_stupid : Model -> List SomeHex -> List SomeHex
+hex_way_stupid model acc = 
+    (List.append acc [Hex (Coords 2 0 -2)])
+
+hex_way : Model -> List SomeHex -> Angle -> List SomeHex
+hex_way model acc in_angle = 
+    if (List.length acc) > 5 then
+        acc
+    else
+    
+    case (List.head (List.reverse acc)) of
+        Just from ->
+            if (goes_laser_trough (from)) == False then
                 acc
+            else
+            case (find_hex_by_coords model.hexes (coords_by_coords_and_angle (get_coords from) (get_angle from in_angle))) of
+                Just a -> (hex_way model (List.append acc [a]) (get_angle a in_angle))
+                Nothing ->
+                    acc  
+        Nothing -> 
+            acc
+
 
 laser_from_hex : SomeHex -> Model -> String
 laser_from_hex hex model = 
     let
         start = (hex_center hex model)
         start_s = "M "++ (String.fromFloat (Tuple.first start)) ++ " " ++ (String.fromFloat (Tuple.second start))
-            
-        hexes_in_path = List.append [ (next_hex hex model)] [hex]
         l h m = 
             " L "++ (String.fromFloat (Tuple.first (hex_center h m))) ++" "++ (String.fromFloat (Tuple.second (hex_center h m)))
 
-        hw = (hex_way model [])
+        hw = (hex_way model [hex] (get_angle hex QS))
         _ = Debug.log "hw" hw
     in
         --" L 50 50"
-        start_s ++ (String.join " " (List.map (\h -> (l h model)) hexes_in_path))
+        start_s ++ (String.join " " (List.map (\h -> (l h model)) hw))
 
 round1 : Model
 round1 = 
     {size = 64
     , start = (64.0, 64.0)
-    , hexes = Array.fromList [ Laser (Coords 0 0 0) (Angle 90) , Hex (Coords 1 0 -1), Hex (Coords 2 0 -2), Hex (Coords 0 1 -1), Hex (Coords 0 3 -3), Stone (Coords 0 2 -2) ]
+    , hexes = Array.fromList [ Laser (Coords 0 0 0) RS , Hex (Coords 1 0 -1), Hex (Coords 2 0 -2), Hex (Coords 0 1 -1), Hex (Coords 0 3 -3), Stone (Coords 0 2 -2) ]
     , field_size = ( 800, 600 )
     , clicks = 0
     } 
