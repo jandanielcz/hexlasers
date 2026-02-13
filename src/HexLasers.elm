@@ -92,23 +92,27 @@ is_same_or_opposite_angle entry mirror =
 
 calculate_mirror_angle: Angle -> Angle -> Angle
 calculate_mirror_angle entry mirror = 
+    let
+        _ = Debug.log "entry" entry
+        _ = Debug.log "mirror" mirror
+    in
     if (is_same_or_opposite_angle entry mirror)
         then 
             entry
         else
         case entry of
             QR -> 
-                RS
-            QS ->
-                RQ
-            RS ->
-                SQ
-            RQ ->
-                SR
-            SQ ->
-                QR
-            SR ->
                 QS
+            QS ->
+                RS
+            RS ->
+                RQ
+            RQ ->
+                SQ
+            SQ ->
+                SR
+            SR ->
+                QR
 
 next_angle : Angle -> Angle
 next_angle a = 
@@ -120,17 +124,31 @@ next_angle a =
         SQ -> SR
         SR -> QR
 
-get_angle : SomeHex -> Angle -> Angle
-get_angle h entry =
+trough_angle a =
+    case a of
+        QR -> RQ
+        QS -> SQ
+        RS -> SR
+        RQ -> QR
+        SQ -> QS
+        SR -> RS
+
+get_next_angle : SomeHex -> Angle -> Angle
+get_next_angle h last_angle =
+    --let
+        --_ = Debug.log "h" h
+        --_ = Debug.log "entry" entry 
+        --_ = Debug.log "tr" (trough_angle entry)
+    --in
     case h of
         Laser _ a -> 
             a
         Hex _ -> 
-            entry
+            last_angle
         Stone _ -> 
-            entry  
+            last_angle 
         Mirror _ a ->
-            (calculate_mirror_angle entry a)      
+            (calculate_mirror_angle last_angle a)      
 
 goes_laser_trough : SomeHex -> Bool
 goes_laser_trough h =
@@ -248,9 +266,6 @@ draw_laser hex model =
         Svg.path [ d (laser_from_hex hex model), stroke "red", strokeWidth "3px", fill "none"] []
     ]
 
-next_hex : SomeHex -> Model -> SomeHex
-next_hex source model = 
-    Hex (Coords 0 3 -3)
 
 coords_by_coords_and_angle : Coords -> Angle -> Coords
 coords_by_coords_and_angle coords a = 
@@ -280,13 +295,15 @@ find_hex_by_coords hexes coords =
     in
         List.head (Array.toList f)
 
--- TODO: recustion does not work
-hex_way_stupid : Model -> List SomeHex -> List SomeHex
-hex_way_stupid model acc = 
-    (List.append acc [Hex (Coords 2 0 -2)])
+
 
 hex_way : Model -> List SomeHex -> Angle -> List SomeHex
-hex_way model acc in_angle = 
+hex_way model acc last_angle = 
+
+    let
+        _ = Debug.log "la" last_angle
+    in
+
     if (List.length acc) > 5 then
         acc
     else
@@ -296,8 +313,9 @@ hex_way model acc in_angle =
             if (goes_laser_trough (from)) == False then
                 acc
             else
-            case (find_hex_by_coords model.hexes (coords_by_coords_and_angle (get_coords from) (get_angle from in_angle))) of
-                Just a -> (hex_way model (List.append acc [a]) (get_angle a in_angle))
+            -- finds a hex and adds it to acc list
+            case (find_hex_by_coords model.hexes (coords_by_coords_and_angle (get_coords from) (get_next_angle from last_angle))) of
+                Just a -> (hex_way model (List.append acc [a]) (get_next_angle from last_angle))
                 Nothing ->
                     acc  
         Nothing -> 
@@ -312,8 +330,7 @@ laser_from_hex hex model =
         l h m = 
             " L "++ (String.fromFloat (Tuple.first (hex_center h m))) ++" "++ (String.fromFloat (Tuple.second (hex_center h m)))
 
-        hw = (hex_way model [hex] (get_angle hex QS))
-        _ = Debug.log "hw" hw
+        hw = (hex_way model [hex] (get_next_angle hex QS))
     in
         --" L 50 50"
         start_s ++ (String.join " " (List.map (\h -> (l h model)) hw))
@@ -322,7 +339,7 @@ round1 : Model
 round1 = 
     {size = 64
     , start = (64.0, 64.0)
-    , hexes = Array.fromList [ Laser (Coords 0 0 0) QS , Hex (Coords 1 0 -1), Mirror (Coords 2 0 -2) QS, Hex (Coords 0 1 -1), Hex (Coords 1 1 -2), Hex (Coords 0 3 -3), Stone (Coords 0 2 -2) ]
+    , hexes = Array.fromList [ Laser (Coords 0 0 0) QS , Hex (Coords 1 0 -1), Mirror (Coords 2 0 -2) QR, Hex (Coords 2 1 -3), Hex (Coords 0 1 -1), Hex (Coords 1 1 -2), Hex (Coords 0 3 -3), Mirror (Coords 0 2 -2) QR ]
     , field_size = ( 800, 600 )
     , clicks = 0
     } 
@@ -346,7 +363,6 @@ update msg model =
     case msg of
         UserClickedCell s ->
             let 
-                _ = Debug.log "UserClickedCell" s
                 rotated_hexes = (rotate_hex model.hexes s)
             in
                 { model | clicks = model.clicks + 1, hexes = rotated_hexes }
@@ -356,9 +372,6 @@ view : Model -> Html.Html Msg
 view model = 
 
     let
-        _ = Debug.log "model" model
-        -- _ = Debug.log "vs" (vertical_spacing size)
-
         filter_laser l = 
             case l of
                 Laser _ _ -> True
@@ -366,7 +379,6 @@ view model =
 
         lasers = Array.filter filter_laser model.hexes
         laser_svgs = Array.map (\n -> (draw_laser n model )) lasers
-        _ = Debug.log "lasers" laser_svgs
     in
     
 
