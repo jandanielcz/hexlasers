@@ -34,6 +34,7 @@ type SomeHex
     = Hex Coords
     | Stone Coords
     | Laser Coords Angle
+    | Mirror Coords Angle
  
 type Msg
     = UserClickedCell String
@@ -50,12 +51,12 @@ type alias Model =
 angle_to_int : Angle -> Int
 angle_to_int a = 
     case a of 
-        QR -> 45
-        QS -> 90
-        RS -> 135
-        RQ -> 225
-        SQ -> 270
-        SR -> 315
+        QR -> 0
+        QS -> 60
+        RS -> 120
+        RQ -> 180
+        SQ -> 240
+        SR -> 300
 
 get_coords : SomeHex -> Coords
 get_coords s = 
@@ -66,14 +67,70 @@ get_coords s =
             c
         Laser c _ ->
             c
+        Mirror c _ ->
+            c
 
+is_same_or_opposite_angle : Angle -> Angle -> Bool
+is_same_or_opposite_angle entry mirror = 
+    if (entry == mirror) then
+        True
+    else
+        case (entry, mirror) of
+            (QR, RQ) -> 
+                True
+            (RQ, QR) ->
+                True
+            (QS, SQ) -> 
+                True
+            (SQ, QS) ->
+                True
+            (SR, RS) -> 
+                True
+            (RS, SR) ->
+                True
+            (_, _) -> False
+
+calculate_mirror_angle: Angle -> Angle -> Angle
+calculate_mirror_angle entry mirror = 
+    if (is_same_or_opposite_angle entry mirror)
+        then 
+            entry
+        else
+        case entry of
+            QR -> 
+                RS
+            QS ->
+                RQ
+            RS ->
+                SQ
+            RQ ->
+                SR
+            SQ ->
+                QR
+            SR ->
+                QS
+
+next_angle : Angle -> Angle
+next_angle a = 
+    case a of 
+        QR -> QS
+        QS -> RS
+        RS -> RQ
+        RQ -> SQ
+        SQ -> SR
+        SR -> QR
 
 get_angle : SomeHex -> Angle -> Angle
 get_angle h entry =
     case h of
-        Laser _ a -> a
-        Hex _ -> entry
-        Stone _ -> entry         
+        Laser _ a -> 
+            a
+        Hex _ -> 
+            entry
+        Stone _ -> 
+            entry  
+        Mirror _ a ->
+            (calculate_mirror_angle entry a)      
 
 goes_laser_trough : SomeHex -> Bool
 goes_laser_trough h =
@@ -101,6 +158,8 @@ hex_to_grid_generator model id hex =
             (blank_hex_svg (hex_center hex model) model.size (String.fromInt id))
         Laser c a ->
             (laser_hex_svg (hex_center hex model) model.size (String.fromInt id) a)
+        Mirror c a ->
+            (mirror_hex_svg (hex_center hex model) model.size (String.fromInt id) a)
 
 base_grid : Model -> List (Svg Msg)
 base_grid h = Array.toList ((Array.indexedMap (hex_to_grid_generator h) h.hexes))
@@ -164,13 +223,23 @@ blank_hex_svg a_center a_size a_id =
 
 stone_hex_svg : ( Float, Float ) -> Int -> String -> Svg Msg
 stone_hex_svg a_center a_size a_id =   
-    Svg.path [ onClick (UserClickedCell a_id), d (path_definition a_center a_size), stroke "black", fill "black", id a_id] []
+    Svg.g [] [
+        Svg.path [ onClick (UserClickedCell a_id), d (path_definition a_center a_size), stroke "none", fill "beige", id a_id] []
+        , (Graphics.Hexes.stone (floats_to_XY a_center) a_size )
+    ]
 
 laser_hex_svg : ( Float, Float ) -> Int -> String -> Angle -> Svg Msg
 laser_hex_svg a_center a_size a_id a_angle =   
     Svg.g [] [
         Svg.path [ onClick (UserClickedCell a_id), d (path_definition a_center a_size), stroke "none", fill "beige", id a_id] []
         , (Graphics.Hexes.laser (floats_to_XY a_center) a_size (angle_to_int a_angle) )
+    ]
+
+mirror_hex_svg : ( Float, Float ) -> Int -> String -> Angle -> Svg Msg
+mirror_hex_svg a_center a_size a_id a_angle =   
+    Svg.g [] [
+        Svg.path [ onClick (UserClickedCell a_id), d (path_definition a_center a_size), stroke "none", fill "beige", id a_id] []
+        , (Graphics.Hexes.mirror (floats_to_XY a_center) a_size (angle_to_int a_angle) )
     ]
 
 draw_laser: SomeHex -> Model -> Svg Msg
@@ -253,11 +322,24 @@ round1 : Model
 round1 = 
     {size = 64
     , start = (64.0, 64.0)
-    , hexes = Array.fromList [ Laser (Coords 0 0 0) RS , Hex (Coords 1 0 -1), Hex (Coords 2 0 -2), Hex (Coords 0 1 -1), Hex (Coords 0 3 -3), Stone (Coords 0 2 -2) ]
+    , hexes = Array.fromList [ Laser (Coords 0 0 0) QS , Hex (Coords 1 0 -1), Mirror (Coords 2 0 -2) QS, Hex (Coords 0 1 -1), Hex (Coords 1 1 -2), Hex (Coords 0 3 -3), Stone (Coords 0 2 -2) ]
     , field_size = ( 800, 600 )
     , clicks = 0
     } 
 
+
+rotate_hex : Array.Array SomeHex -> String -> Array.Array SomeHex
+rotate_hex a index_s = 
+    case (String.toInt index_s) of
+        Nothing -> a
+        Just index ->
+            case (Array.get index a) of
+                Nothing -> a
+                Just s ->
+                    case s of
+                        Mirror c angle ->
+                            Array.set index (Mirror c (next_angle angle)) a
+                        _ -> a
 
 update : Msg -> Model -> Model
 update msg model =
@@ -265,8 +347,9 @@ update msg model =
         UserClickedCell s ->
             let 
                 _ = Debug.log "UserClickedCell" s
+                rotated_hexes = (rotate_hex model.hexes s)
             in
-                { model | clicks = model.clicks + 1 }
+                { model | clicks = model.clicks + 1, hexes = rotated_hexes }
 
 
 view : Model -> Html.Html Msg
