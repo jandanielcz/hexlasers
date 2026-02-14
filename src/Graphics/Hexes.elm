@@ -36,3 +36,14 @@ stone xy size =
         Svg.svg [width s, height s, viewBox "0 0 32 32", x (x_string xy), y (y_string xy), transform translate] [
             Svg.path [stroke "black", strokeWidth "3", strokeLinecap "round", strokeLinejoin "bevel", d "M 5 30 L 24 30 L 28 22 L 16 14 L 13 14 L 4 20 Z", fill "gray", transformOrigin "center center"] []
         ]
+
+bulb : XY -> Int -> Bool -> Svg.Svg msg
+bulb xy size glows = 
+    let
+        s = String.fromInt size
+        translate = "translate(-"++ String.fromFloat ((toFloat size) / 2) ++", -"++ String.fromFloat ((toFloat size) / 2) ++")"
+        bg = if glows then "yellow" else "lightgray"
+    in
+        Svg.svg [width s, height s, viewBox "0 0 32 32", x (x_string xy), y (y_string xy), transform translate] [
+            Svg.circle [stroke "black", strokeWidth "3", cx "16", cy "16", r "12", fill bg, transformOrigin "center center"] []
+        ]
