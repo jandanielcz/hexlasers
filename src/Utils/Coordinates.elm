@@ -1,5 +1,4 @@
 module Utils.Coordinates exposing (..)
-import Html.Events exposing (on)
 
 type XY = XY Float Float
 

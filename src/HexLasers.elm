@@ -7,7 +7,6 @@ import Svg.Attributes exposing (..)
 import Array
 import Tuple
 import String
-import Debug
 import Html.Events exposing (onClick)
 import Browser
 import Graphics.Hexes
@@ -29,11 +28,8 @@ calculate_mirror_angle: Angle -> Angle -> Angle
 calculate_mirror_angle last_angle mirror_angle = 
     let
         in_angle = (trough_angle last_angle)
-        directly_facing = [mirror_angle, (trough_angle mirror_angle)]
-        --_ = Debug.log "in" (in_angle)   
-        --_ = Debug.log "rm" (directly_facing) 
+        directly_facing = [mirror_angle, (trough_angle mirror_angle)] 
         diff = (angle_to_ord in_angle) - (angle_to_ord mirror_angle)
-        --_ = Debug.log "diff" diff
     in
         -- if mirror is diretly facing in wall then return to that 
         if (List.member in_angle directly_facing) then
@@ -227,7 +223,6 @@ laser_from_hex hex model =
             " L "++ (String.fromFloat (Tuple.first (hex_center h m))) ++" "++ (String.fromFloat (Tuple.second (hex_center h m)))
 
         hw = (hex_way model.hexes [hex] (get_next_angle hex RS))
-        --_ = Debug.log "hw" hw
     in
         --" L 50 50"
         start_s ++ (String.join " " (List.map (\h -> (l h model)) hw))
@@ -259,7 +254,6 @@ check_bulbs hexes =
         hw = case (List.head (Array.toList lasers)) of
             Just a -> (hex_way hexes [a] (get_next_angle a RS))
             Nothing -> []
-        _ = Debug.log "hw" hw
 
         glow_bulbs a =
             if (List.member a hw) then
